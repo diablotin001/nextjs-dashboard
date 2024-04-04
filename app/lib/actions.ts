@@ -130,21 +130,11 @@ export async function deleteInvoice(id: string) {
 
 const CustomerSchema = z.object({
     id: z.string(),
-    name: z.string({
-        invalid_type_error: 'Please enter a customer name.',
-    }),
-    email: z.string({
-        invalid_type_error: 'Please enter a customer email.',
-    }),
-    image_url: z.string({
-        invalid_type_error: 'Please enter a customer image_url.',
-    }),
-    // date: z.string(),
+    name: z.string().min(3, 'Please enter a customer name.'),
+    email: z.string().min(5, 'Please enter a customer email.'),
+    image_url: z.string().min(8, 'Please enter a customer image url.'),
 });
-// id: string;
-// name: string;
-// email: string;
-// image_url: string;
+
 const CreateCustomer = CustomerSchema.omit({ id: true });
 
 // This is temporary until @types/react-dom is updated
@@ -189,8 +179,47 @@ export async function createCustomer(prevState: CustomerState, formData: FormDat
     redirect('/dashboard/customers');
 }
 
+// Use Zod to update the expected types
+const UpdateCustomer = CustomerSchema.omit({ id: true, date: true });
+
+export async function updateCustomer(
+    id: string,
+    prevState: CustomerState,
+    formData: FormData,
+) {
+    const validatedFields = UpdateCustomer.safeParse({
+        name: formData.get('name'),
+        email: formData.get('email'),
+        image_url: formData.get('image_url'),
+    });
+
+    if (!validatedFields.success) {
+        return {
+            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Missing Fields. Failed to Update Customer.',
+        };
+    }
+
+    const { name, email, image_url } = validatedFields.data;
+
+    try {
+        await sql`
+      UPDATE customers
+      SET name = ${name}, email = ${email}, image_url = ${image_url}
+      WHERE id = ${id}
+    `;
+    } catch (error) {
+        return {
+            message: 'Database Error: Failed to Update Customer.',
+        };
+    }
+
+    revalidatePath('/dashboard/customers');
+    redirect('/dashboard/customers');
+}
+
 export async function deleteCustomer(id: string) {
-    throw new Error('Failed to Delete Customer');
+    // throw new Error('Failed to Delete Customer');
     try {
         await sql`DELETE FROM customers WHERE id = ${id}`;
     } catch (error) {
